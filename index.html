@@ -281,6 +281,23 @@ a.hl{display:block;text-decoration:none;color:var(--hero-fg)}
   .bottom{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));border-radius:22px;border:1px solid var(--line);padding:6px 6px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .main{padding-bottom:110px}
 }
+/* ===== tabela ao vivo, noticias, jogador ===== */
+.lv td{background:rgba(229,55,43,.12)}
+.lchip{display:inline-block;background:var(--live);color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700;margin-left:8px;white-space:nowrap}
+.lchip em{font-style:normal;opacity:.85;margin-left:4px;font-weight:500}
+.pup,.pdn{font-style:normal;font-size:10px;font-weight:700;margin-left:4px}
+.pup{color:var(--good)}.pdn{color:var(--bad)}
+.lgban{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;text-decoration:none;color:inherit}
+.lgrow{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
+.lgrow b{font-variant-numeric:tabular-nums}
+.nimg{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:var(--surface2);display:block}
+.cupgrid{display:flex;flex-direction:column;gap:10px}
+.tie{display:flex;flex-direction:column;gap:8px}
+.tie.me{border-color:var(--accent)}
+.tie .tt{display:flex;align-items:center;gap:10px;justify-content:space-between;font-weight:600}
+.tie .tt span.l{display:flex;align-items:center;gap:8px;min-width:0}
+.tie .leg{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.tie .adv{font-size:13px;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -417,7 +434,7 @@ const NEWS0 = [
   {id:"a7",cat:"Jogos",urgent:false,m:1100,src:"Lance!",t:"Análise: o que o Santos precisa corrigir para segurar resultados fora de casa",sum:"Time perdeu a posse no segundo tempo em três das últimas quatro partidas como visitante.",also:[]},
   {id:"a8",cat:"Mercado da bola",urgent:false,m:1700,src:"UOL Esporte",t:"Atacante emprestado pode voltar ao Santos após fim de contrato",sum:"Clube ainda avalia se vale a pena reintegrar o jogador ao elenco principal.",also:["GE Santos"]}
 ];
-const NEWSCATS = ["Todas","Jogos","Contratações","Bastidores","Diretoria","Mercado da bola","Base"];
+const NEWSCATS = ["Todas","Jogos","Contratações","Bastidores","Diretoria","Mercado da bola","Base","Geral"];
 
 const SETS0 = [
   {id:"s1",handle:"setorista_alvinegro",name:"Setorista Alvinegro",cat:"Setoristas",on:true},
@@ -533,7 +550,7 @@ function mapEvents(ke){
     return {t,s:mine,mm:(k.clock&&k.clock.displayValue)||"",p};
   });
 }
-window.__sfc={get pollLive(){return pollLive;},get loadReal(){return loadReal;}};
+window.__sfc={get pollLive(){return pollLive;},get loadReal(){return loadReal;},get pollLeague(){return pollLeague;}};
 const COMPT=[
  [/Lineups are announced and players are warming up\./gi,"Escalações definidas, os jogadores se aquecem."],
  [/First Half begins\./gi,"Começa o primeiro tempo."],[/Second Half begins[^.]*\./gi,"Começa o segundo tempo."],
@@ -563,13 +580,131 @@ function mapCom(c){
   return (c||[]).filter(x=>x.text).map(x=>{const ty=(x.play&&x.play.type&&x.play.type.type)||""; const k=(x.play&&x.play.scoringPlay)||/goal/.test(ty)?"gol":/yellow/.test(ty)?"am":/red-card/.test(ty)?"vm":/substitution/.test(ty)?"sub":"";
     return {mm:(x.time&&x.time.displayValue)||"",tx:ptCom(x.text),k,q:x.sequence||0};}).sort((a,b)=>b.q-a.q);
 }
+/* ---------- noticias reais ---------- */
+let NEWS_REAL=null;
+const NCAT=[["Contratações",/contrat|refor[cç]o|renova|assina|empr[eé]stimo|acerta|rescis/i],["Mercado da bola",/mercado|proposta|interesse|negocia|sondagem|alvo/i],["Diretoria",/presidente|conselho|elei[cç][aã]o|diretoria|cnrd|d[ií]vida|condenad|justi[cç]a|or[cç]amento/i],["Base",/sub-?(20|17|15)|\bbase\b|meninos da vila/i],["Jogos",/jogo|rodada|\bgol\b|vence|vit[oó]ria|derrota|empate|partida|escala[cç][aã]o|cl[aá]ssico|pr[eé]vi|desfalque|enfrenta/i],["Bastidores",/treino|bastidor|les[aã]o|departamento m[eé]dico|entrevista|coletiva/i]];
+const catOf=t=>{for(const [c,r] of NCAT)if(r.test(t))return c; return "Geral";};
+const toks_=x=>new Set(norm_(x).split(/[^a-z0-9]+/).filter(w=>w.length>3));
+async function loadNews(){
+  const j=await jget(API+"bra.1/news?team="+TEAM+"&lang=pt&region=br&limit=40");
+  const arr=(j.articles||[]).filter(a=>a.headline&&a.published).map(a=>{const url=(a.links&&a.links.web&&a.links.web.href)||""; const ts=Date.parse(a.published);
+    return {id:"n"+(a.id||a.headline),cat:catOf(a.headline+" "+(a.description||"")),urgent:/oficial|confirma|anuncia|demite|rescinde|condenad|acerta|fecha com/i.test(a.headline)&&(now()-ts)<8*H,ts,t:a.headline,sum:a.description||"",src:"ESPN",also:[],img:(a.images&&a.images[0]&&a.images[0].url)||"",url,video:/\/video\//.test(url)};});
+  arr.sort((x,y)=>(x.video-y.video)||(y.ts-x.ts));
+  const out=[]; arr.forEach(n=>{const tn=toks_(n.t); const dup=out.some(o=>{const to=toks_(o.t); let c=0; tn.forEach(w=>{if(to.has(w))c++;}); return c/Math.max(1,Math.min(tn.size,to.size))>=0.6;}); if(!dup)out.push(n);});
+  out.sort((x,y)=>y.ts-x.ts); NEWS_REAL=out.slice(0,30);
+}
+/* ---------- jogador: estatisticas e historico ---------- */
+const LGNAME={"bra.1":"Brasileirão","bra.copa_do_brazil":"Copa do Brasil","bra.camp.paulista":"Paulistão","conmebol.sudamericana":"Sul-Americana","conmebol.libertadores":"Libertadores"};
+async function loadPlayerExtra(p){
+  if(p.extra||p.exLoading||!REAL||!p.espn)return; p.exLoading=true; const id=p.id.slice(1);
+  const [ov,bio]=await Promise.allSettled([jget("https://site.web.api.espn.com/apis/common/v3/sports/soccer/athletes/"+id+"/overview"),jget("https://site.api.espn.com/apis/common/v3/sports/soccer/athletes/"+id+"/bio")]);
+  const ex={splits:[],hist:[]};
+  if(ov.status==="fulfilled"&&ov.value&&ov.value.statistics){const st=ov.value.statistics; ex.splits=(st.splits||[]).filter(x=>x.teamId===TEAM).map(x=>({lg:LGNAME[x.leagueSlug]||x.displayName,d:Object.fromEntries((st.names||[]).map((n,i)=>[n,+x.stats[i]||0]))}));}
+  if(bio.status==="fulfilled"&&bio.value&&bio.value.teamHistory){ex.hist=bio.value.teamHistory.map(h=>{const rs=String(h.seasons||"").split(/,\s*/).map(x=>{const m=x.match(/(\d{4})\s*-\s*(\d{4}|CURRENT)/i); return m?[+m[1],/CURRENT/i.test(m[2])?9999:+m[2]]:null;}).filter(Boolean).sort((p,q)=>p[0]-q[0]); const mg=[]; rs.forEach(r=>{const l=mg[mg.length-1]; if(l&&r[0]<=l[1]+1)l[1]=Math.max(l[1],r[1]); else mg.push([r[0],r[1]]);}); return {n:h.displayName,a:mg.length?mg[0][0]:0,l:mg.map(r=>r[0]===r[1]?String(r[0]):r[0]+"–"+(r[1]===9999?"atual":r[1])).join(", ")};}).sort((x,y)=>x.a-y.a).map(h=>h.n+(h.l?" ("+h.l+")":""));}
+  p.extra=ex; p.exLoading=false; if(curView()==="jogador")route();
+}
+/* ---------- classificacao ao vivo ---------- */
+const LGL={live:[],all:[],incl:null,inclEid:null,t:null};
+let LV="live";
+async function refreshStandings(){
+  try{const br=mapStandings(await jget("https://site.api.espn.com/apis/v2/sports/soccer/bra.1/standings")); if(br&&CAMP["Brasileirão"]){CAMP["Brasileirão"].rows=br; CAMP["Brasileirão"].phase="Rodada "+Math.max(...br.map(r=>r.j)); LGL.incl=null; LGL.inclEid=null; LASTSYNC=now(); if(["campeonatos","inicio","partida"].includes(curView())&&!document.querySelector(".vplayer iframe"))route();}}catch(e){}
+}
+async function checkIncl(ev){
+  if(LGL.incl!=null&&LGL.inclEid===ev.eid)return;
+  const row=(CAMP["Brasileirão"]&&CAMP["Brasileirão"].rows||[]).find(r=>r.id===ev.h.id); if(!row)return;
+  const sc=await jget(API+"bra.1/teams/"+ev.h.id+"/schedule"); const post=(sc.events||[]).filter(e=>e.competitions[0].status.type.state==="post").length;
+  LGL.incl=row.j>post; LGL.inclEid=ev.eid;
+}
+async function pollLeague(){
+  clearTimeout(LGL.t); if(!REAL||!CAMP["Brasileirão"])return;
+  let delay=120000;
+  try{
+    const sb=await jget(API+"bra.1/scoreboard");
+    const evs=(sb.events||[]).map(e=>{const c=e.competitions[0], h=c.competitors.find(x=>x.homeAway==="home"), a=c.competitors.find(x=>x.homeAway==="away");
+      [h,a].forEach(x=>{if(x.team.logos&&x.team.logos[0])LOGO[x.team.shortDisplayName||x.team.displayName]=x.team.logos[0].href;});
+      return {eid:e.id,state:c.status.type.state,desc:c.status.type.name,clock:c.status.displayClock||"",t:Date.parse(e.date),
+        h:{id:h.team.id,n:h.team.shortDisplayName||h.team.displayName,s:num_(h.score)||0},a:{id:a.team.id,n:a.team.shortDisplayName||a.team.displayName,s:num_(a.score)||0}};});
+    const live=evs.filter(x=>x.state==="in"); const was=LGL.live.map(x=>x.eid);
+    LGL.live=live; LGL.all=evs;
+    if(was.some(id=>!live.find(x=>x.eid===id))){setTimeout(refreshStandings,45000); setTimeout(refreshStandings,180000);}
+    if(live.length)await checkIncl(live[0]);
+    const soon=evs.some(x=>x.state==="pre"&&x.t-now()<30*MIN&&x.t-now()>-5*MIN);
+    delay=live.length?15000:soon?30000:120000;
+    if((live.length||was.length)&&["campeonatos","inicio","partida"].includes(curView())&&!document.querySelector(".vplayer iframe"))route();
+  }catch(e){delay=60000;}
+  LGL.t=setTimeout(pollLeague,delay);
+}
+function projectRows(rows,live){
+  const m=new Map(rows.map(r=>[r.id,{...r,live:null}])), old=new Map(rows.map(r=>[r.id,r.rank||999]));
+  live.forEach(g=>{[[g.h,g.a],[g.a,g.h]].forEach(([x,y])=>{const r=m.get(x.id); if(!r)return; r.live={g:x.s,o:y.s,clock:g.clock}; if(LGL.incl)return; r.j++; r.gp+=x.s; r.gc+=y.s; r.sg=r.gp-r.gc; if(x.s>y.s){r.v++;r.pts+=3;}else if(x.s===y.s){r.e++;r.pts+=1;}else r.d++;});});
+  const arr=[...m.values()].sort((a,b)=>b.pts-a.pts||b.v-a.v||b.sg-a.sg||b.gp-a.gp||(old.get(a.id)-old.get(b.id)));
+  const offPos=new Map([...rows].sort((a,b)=>(a.rank||999)-(b.rank||999)).map((r,i)=>[r.id,i+1]));
+  arr.forEach((r,i)=>{r.pos=i+1; r.dlt=LGL.incl?0:(offPos.get(r.id)-(i+1));}); return arr;
+}
+function tableRows(name){
+  const c=CAMP[name]; if(!c||!c.rows)return null;
+  if(name==="Brasileirão"&&LGL.live.length&&LV==="live")return projectRows(c.rows,LGL.live);
+  return [...c.rows].sort(sortT).map((r,i)=>({...r,pos:i+1,dlt:0,live:null}));
+}
+function tableHTML(name,full){
+  const c=CAMP[name], rows=tableRows(name); if(!rows)return `<div class="empty">Tabela não disponível para esta competição.</div>`;
+  const hd=full?"<th>#</th><th>Time</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th>":"<th>#</th><th>Time</th><th>P</th><th>J</th><th>V</th><th>SG</th>";
+  return `<div class="table-wrap"><table class="num"><thead><tr>${hd}</tr></thead><tbody>${rows.map((r,i)=>{
+    const ar=r.dlt>0?`<i class="pup">▲${r.dlt}</i>`:r.dlt<0?`<i class="pdn">▼${-r.dlt}</i>`:"";
+    const lc=r.live?`<span class="lchip">${r.live.g}-${r.live.o}<em>${esc(r.live.clock)}</em></span>`:"";
+    const nm=`<td><span style="display:inline-flex;align-items:center;gap:8px">${tb(r.t,20)}${esc(r.t)}${lc}</span></td>`;
+    const cells=full?`<td><b>${r.pts}</b></td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg}</td>`:`<td><b>${r.pts}</b></td><td>${r.j}</td><td>${r.v}</td><td>${r.sg}</td>`;
+    return `<tr class="${r.t===SANTOS?"me":""} ${r.live?"lv":""} ${i<c.lib?"z-lib":i>=rows.length-c.reb?"z-reb":""}"><td>${r.pos}${ar}</td>${nm}${cells}</tr>`;}).join("")}</tbody></table></div>`;
+}
+function liveRows(){
+  return LGL.live.map(g=>{const mine=NEXT.find(m=>m.eid===g.eid); const inner=`<div class="mst live num"><b>${esc(g.clock||"Ao vivo")}</b></div><div class="mtm"><div class="tr2">${tb(g.h.n,22)}<span class="nm2">${esc(g.h.n)}</span></div><div class="tr2">${tb(g.a.n,22)}<span class="nm2">${esc(g.a.n)}</span></div></div><div class="msc num"><b>${g.h.s}</b><b>${g.a.s}</b></div>`;
+    return mine?`<a class="mr" href="#partida-${esc(mine.id)}">${inner}</a>`:`<div class="mr">${inner}</div>`;}).join("");
+}
+function lgBanner(){
+  if(!LGL.live.length)return "";
+  return `<a class="card lgban" href="#campeonatos"><div class="row" style="justify-content:space-between"><span class="livepill">Brasileirão ao vivo</span><span class="muted small">Ver tabela ao vivo</span></div>${LGL.live.map(g=>`<div class="lgrow">${tb(g.h.n,20)}<span>${esc(g.h.n)}</span><b>${g.h.s} x ${g.a.s}</b><span>${esc(g.a.n)}</span>${tb(g.a.n,20)}<span class="muted small">${esc(g.clock)}</span></div>`).join("")}</a>`;
+}
+/* ---------- copas e mata-matas ---------- */
+const CUPSLUG={"Copa do Brasil":"bra.copa_do_brazil","Sul-Americana":"conmebol.sudamericana","Libertadores":"conmebol.libertadores"};
+const STAGES={"first-round":"1ª fase","second-round":"2ª fase","third-round":"3ª fase","fourth-round":"4ª fase","fifth-round":"5ª fase","knockout-round-playoffs":"Playoffs","round-of-16":"Oitavas","quarterfinals":"Quartas","semifinals":"Semifinal","final":"Final"};
+const CUPDATA={}, CUPSTAGE={};
+async function loadCup(name){
+  const slug=CUPSLUG[name]; if(!slug||CUPDATA[name]||CUPDATA["_"+name])return; CUPDATA["_"+name]=1;
+  try{const j=await jget(API+slug+"/scoreboard?dates="+(new Date().getFullYear())+"&limit=400");
+    CUPDATA[name]=(j.events||[]).map(e=>{const c=e.competitions[0], h=c.competitors.find(x=>x.homeAway==="home"), a=c.competitors.find(x=>x.homeAway==="away");
+      [h,a].forEach(x=>{if(x.team.logos&&x.team.logos[0])LOGO[x.team.shortDisplayName||x.team.displayName]=x.team.logos[0].href;});
+      return {st:(e.season&&e.season.slug)||"",t:Date.parse(e.date),state:c.status.type.state,h:{id:h.team.id,n:h.team.shortDisplayName||h.team.displayName,s:num_(h.score)||0},a:{id:a.team.id,n:a.team.shortDisplayName||a.team.displayName,s:num_(a.score)||0},note:(c.notes&&c.notes[0]&&c.notes[0].headline)||""};});
+  }catch(e){CUPDATA[name]=[];}
+  if(curView()==="campeonatos")route();
+}
+function ptNote(n){
+  return n.replace(/(.+?) advances? (\d+)-(\d+) on penalties.*/i,"$1 avança nos pênaltis ($2-$3)").replace(/(.+?) advances? (\d+)-(\d+) on aggregate.*/i,"$1 avança no agregado ($2-$3)").replace(/(.+?) wins? (\d+)-(\d+) on aggregate.*/i,"$1 avança no agregado ($2-$3)").replace(/(.+?) advances? on away goals.*/i,"$1 avança pelos gols fora");
+}
+function cupHTML(name){
+  const ev=CUPDATA[name]; if(!ev)return `<div class="empty">Carregando chaveamento…</div>`;
+  const present=Object.keys(STAGES).filter(k=>ev.some(e=>e.st===k));
+  if(!present.length)return `<div class="empty">Sem fases eliminatórias disponíveis.</div>`;
+  const stg=present.includes(CUPSTAGE[name])?CUPSTAGE[name]:present[present.length-1];
+  const ties=new Map(); ev.filter(e=>e.st===stg).forEach(e=>{const k=[e.h.id,e.a.id].sort().join("-"); (ties.get(k)||ties.set(k,[]).get(k)).push(e);});
+  const cards=[...ties.values()].map(legs=>{
+    legs.sort((a,b)=>a.t-b.t); const A=legs[0].h, B=legs[0].a; let sa=0,sb=0,played=0;
+    legs.forEach(l=>{if(l.state==="post"||l.state==="in"){played++; const ga=l.h.id===A.id?l.h.s:l.a.s, gb=l.h.id===A.id?l.a.s:l.h.s; sa+=ga; sb+=gb;}});
+    const note=[...legs].reverse().map(l=>l.note).find(Boolean)||""; const done=legs.every(l=>l.state==="post");
+    let adv=note?ptNote(note):(done&&sa!==sb?(sa>sb?A.n:B.n)+" avança":"");
+    const mine=(A.n==="Santos"||B.n==="Santos");
+    return `<div class="card tie ${mine?"me":""}"><div class="tt"><span class="l">${tb(A.n,22)}${esc(A.n)}</span><b class="num">${played?sa:""}</b></div><div class="tt"><span class="l">${tb(B.n,22)}${esc(B.n)}</span><b class="num">${played?sb:""}</b></div>
+      ${legs.map((l,i)=>`<div class="leg"><span>${legs.length>1?(i?"Volta":"Ida"):"Jogo"} · ${fmtShort(l.t)}</span><span class="num">${l.state==="pre"?fmtTime(l.t):esc(l.h.n)+" "+l.h.s+" x "+l.a.s+" "+esc(l.a.n)}${l.state==="in"?" · ao vivo":""}</span></div>`).join("")}
+      ${adv?`<div class="adv">${esc(adv)}</div>`:""}</div>`;});
+  return `<div class="chips">${present.map(k=>`<button class="chip" aria-pressed="${stg===k}" data-stage="${k}">${STAGES[k]}</button>`).join("")}</div><div class="cupgrid" style="margin-top:6px">${cards.join("")}</div>`;
+}
 const POSMAP={Goalkeeper:"Goleiro",Defender:"Defensor",Midfielder:"Meio-campo",Forward:"Atacante",Attacker:"Atacante"};
+const NATPT={Brazil:"Brasil",Argentina:"Argentina",Uruguay:"Uruguai",Paraguay:"Paraguai",Venezuela:"Venezuela",Colombia:"Colômbia",Chile:"Chile",Peru:"Peru",Ecuador:"Equador",Bolivia:"Bolívia",Portugal:"Portugal",Spain:"Espanha",Italy:"Itália",France:"França",Germany:"Alemanha",England:"Inglaterra",Mexico:"México","United States":"Estados Unidos",Japan:"Japão",Angola:"Angola",Panama:"Panamá"};
 function mapRoster(r){
-  return (r.athletes||[]).map(a=>({id:"a"+a.id,name:a.displayName||a.fullName,full:a.fullName,num:a.jersey||"–",pos:POSMAP[(a.position&&(a.position.name||a.position.displayName))||""]||"Meio-campo",nat:a.citizenship||"—",birth:(a.dateOfBirth||"").slice(0,10)||null,h:a.height?Math.round(a.height*2.54)+" cm":null,photo:(a.headshot&&a.headshot.href)||null,st:null,espn:true})).sort((x,y)=>(+x.num||99)-(+y.num||99));
+  return (r.athletes||[]).map(a=>({id:"a"+a.id,name:a.displayName||a.fullName,full:a.fullName,num:a.jersey||"–",pos:POSMAP[(a.position&&(a.position.name||a.position.displayName))||""]||"Meio-campo",nat:NATPT[a.citizenship]||a.citizenship||"—",birth:(a.dateOfBirth||"").slice(0,10)||null,h:a.height?Math.round(a.height*2.54)+" cm":null,photo:(a.headshot&&a.headshot.href)||null,st:null,espn:true})).sort((x,y)=>(+x.num||99)-(+y.num||99));
 }
 function mapStandings(st){
   if(!st||!st.children||!st.children[0])return null;
-  const rows=st.children[0].standings.entries.map(e=>{const g=n=>{const x=e.stats.find(z=>z.name===n); return x?+x.value:0;}; return {t:e.team.shortDisplayName||e.team.displayName,rank:g("rank"),j:g("gamesPlayed"),v:g("wins"),e:g("ties"),d:g("losses"),gp:g("pointsFor"),gc:g("pointsAgainst"),sg:g("pointDifferential"),pts:g("points")};});
+  const rows=st.children[0].standings.entries.map(e=>{const g=n=>{const x=e.stats.find(z=>z.name===n); return x?+x.value:0;}; return {id:e.team.id,t:e.team.shortDisplayName||e.team.displayName,rank:g("rank"),j:g("gamesPlayed"),v:g("wins"),e:g("ties"),d:g("losses"),gp:g("pointsFor"),gc:g("pointsAgainst"),sg:g("pointDifferential"),pts:g("points")};});
   return rows.length?rows:null;
 }
 async function loadReal(){
@@ -831,7 +966,7 @@ function partidaView(id){
   else if(MT==="lance"){ body=lanceTab(m,L,live); }
   else if(MT==="escal"){ body=lineupTab(m); }
   else if(MT==="stats"){ body=(has||live)?statsTab(m,stat):`<div class="empty">As estatísticas aparecem quando a bola rolar.</div>`; }
-  else { body=standTable(CAMP[m.comp]); }
+  else { body=(LGL.live.length&&m.comp==="Brasileirão"?`<div class="card lst" style="margin-bottom:12px">${liveRows()}</div>`:"")+tableHTML(m.comp,false); }
   const back=has?"#jogos-tab-ant":"#jogos-tab-prox";
   const R=57, C=2*Math.PI*R;
   const secNow=(L&&typeof L.clockSec==="number")?L.clockSec+(now()-L.at)/1000:null;
@@ -911,12 +1046,13 @@ function postHTML(p){
     <a class="link row" style="gap:6px;margin-top:8px" href="https://x.com/${encodeURIComponent(s.handle)}" target="_blank" rel="noopener">${ic("link")}<span>Abrir no X</span></a></div></div>`;
 }
 function newsHTML(n){
-  return `<article class="card stack" style="gap:8px">
-    <div class="row" style="gap:8px;flex-wrap:wrap">${n.urgent?'<span class="tag urgent">Urgente</span>':""}<span class="tag">${esc(n.cat)}</span><span class="muted small">${esc(n.src)} · ${ago(now()-n.m*MIN)}</span></div>
+  const t0=n.ts||(now()-n.m*MIN);
+  return `<article class="card stack" style="gap:8px">${n.img?`<img class="nimg" loading="lazy" src="${esc(n.img)}" alt="">`:""}
+    <div class="row" style="gap:8px;flex-wrap:wrap">${n.urgent?'<span class="tag urgent">Urgente</span>':""}<span class="tag">${esc(n.cat)}</span>${n.video?'<span class="tag">Vídeo</span>':""}<span class="muted small">${esc(n.src==="ESPN"&&n.ts?"ESPN Brasil":n.src)} · ${ago(t0)}</span></div>
     <h3 style="font-size:24px;text-transform:none;letter-spacing:0;line-height:1.1">${esc(n.t)}</h3>
     <div class="muted">${esc(n.sum)}</div>
     ${n.also.length?`<div class="muted small">Também em ${n.also.map(esc).join(", ")}</div>`:""}
-    <a class="link row" style="gap:6px" href="${esc(srcUrl(n.src))}" target="_blank" rel="noopener">${ic("link")}<span>Ler na fonte</span></a>
+    <a class="link row" style="gap:6px" href="${esc(n.url||srcUrl(n.src))}" target="_blank" rel="noopener">${ic("link")}<span>${n.video?"Assistir na fonte":"Ler na fonte"}</span></a>
   </article>`;
 }
 const SRC_URL={"GE Santos":"https://ge.globo.com/futebol/times/santos/","ESPN":"https://www.espn.com.br/futebol/time/_/id/2674/santos","UOL Esporte":"https://www.uol.com.br/esporte/futebol/times/santos/","Lance!":"https://www.lance.com.br/santos"};
@@ -932,6 +1068,7 @@ V.inicio=()=>{
   const posts=POSTS0.filter(p=>S.sets.find(s=>s.handle===p.h&&s.on)).slice(0,3);
   const favs=S.players.filter(p=>isFav(p.id));
   return `
+  ${lgBanner()}
   ${LIVE&&!LIVE.done?`<a class="row" href="#jogos" style="text-decoration:none;margin-bottom:12px;gap:10px"><span class="livepill">Ao vivo</span><span class="small muted">Santos ${LIVE.s} x ${LIVE.o} ${esc(LIVE.opp||"")} · ${LIVE.real?clockHTML(LIVE):LIVE.min+"'"}</span></a>`:""}
   ${LIVE&&!LIVE.done?liveHero():(next?nextHero(next):`<div class="empty">Nenhum jogo agendado no momento.</div>`)}
   <section class="sec"><div class="sec-h"><h2>Jogos</h2><a href="#jogos">Ver todos</a></div>
@@ -970,12 +1107,12 @@ V.jogos=(arg)=>{
 };
 
 let newsCat="Todas", newsQ="";
-function activeNews(){const on=new Set(S.sources.filter(s=>s.on).map(s=>s.name)); return NEWS0.filter(n=>on.has(n.src));}
+function activeNews(){const on=new Set(S.sources.filter(s=>s.on).map(s=>s.name)); if(REAL&&NEWS_REAL)return on.has("ESPN")?NEWS_REAL.map(n=>({...n,m:(now()-n.ts)/MIN})):[]; return NEWS0.filter(n=>on.has(n.src));}
 V.noticias=()=>{
   let list=activeNews().filter(n=>(newsCat==="Todas"||n.cat===newsCat)&&(!newsQ||(n.t+n.sum).toLowerCase().includes(newsQ.toLowerCase())));
   list.sort((a,b)=>(b.urgent-a.urgent)||a.m-b.m);
   return `<h1 class="page-t">Notícias</h1>
-    <p class="muted small" style="margin:0 0 12px">Fontes ativas: ${S.sources.filter(s=>s.on).map(s=>esc(s.name)).join(", ")||"nenhuma"} · Atualização a cada ${S.interval} min</p>
+    <p class="muted small" style="margin:0 0 12px">${REAL&&NEWS_REAL?"Notícias reais da ESPN Brasil · atualiza a cada 5 min":"Fontes ativas: "+(S.sources.filter(s=>s.on).map(s=>esc(s.name)).join(", ")||"nenhuma")+" · Atualização a cada "+S.interval+" min"}</p>
     <label class="f"><span class="muted" style="position:absolute;left:-9999px">Buscar</span><input id="nq" type="search" placeholder="Buscar nas notícias" value="${esc(newsQ)}"></label>
     <div class="chips" style="margin-top:10px">${NEWSCATS.map(c=>`<button class="chip" aria-pressed="${newsCat===c}" data-cat="${c}">${c}</button>`).join("")}</div>
     <div class="stack" style="margin-top:8px">${list.map(newsHTML).join("")||'<div class="empty">Nada encontrado com esse filtro.</div>'}</div>`;
@@ -993,26 +1130,37 @@ V.elenco=()=>{
 
 V.jogador=(id)=>{
   const p=S.players.find(x=>x.id===id); if(!p)return `<div class="empty">Jogador não encontrado.</div>`;
-  const a=age(p.birth), st=p.st||null;
+  if(REAL&&p.espn)loadPlayerExtra(p);
+  const a=age(p.birth);
   const b=p.birth?new Intl.DateTimeFormat("pt-BR",{dateStyle:"long"}).format(new Date(p.birth+"T12:00:00")):null;
   const na='<span class="muted">A preencher no Admin</span>';
+  const gk=p.pos==="Goleiro", ex=p.extra;
+  const COLS=gk?[["starts","Tit."],["saves","Defesas"],["goalsConceded","Gols sof."],["cleanSheet","Sem sofrer"],["yellowCards","Am."],["redCards","Verm."]]:[["starts","Tit."],["totalGoals","Gols"],["goalAssists","Assist."],["totalShots","Final."],["shotsOnTarget","No gol"],["foulsCommitted","Faltas"],["yellowCards","Am."],["redCards","Verm."]];
+  const sum=k=>ex?ex.splits.reduce((t,x)=>t+(x.d[k]||0),0):0;
+  let stats="";
+  if(REAL&&p.espn){
+    if(!ex)stats=`<section class="sec"><div class="sec-h"><h2>Temporada 2026</h2></div><div class="empty">Carregando estatísticas…</div></section>`;
+    else if(!ex.splits.length)stats=`<section class="sec"><div class="sec-h"><h2>Temporada 2026</h2></div><div class="empty">A ESPN não tem estatísticas deste jogador.</div></section>`;
+    else stats=`<section class="sec"><div class="sec-h"><h2>Temporada 2026</h2></div>
+      <div class="card stat3">${(gk?[["starts","Titular"],["saves","Defesas"],["cleanSheet","Sem sofrer"]]:[["starts","Titular"],["totalGoals","Gols"],["goalAssists","Assistências"]]).map(([k,l])=>`<div><b class="num">${sum(k)}</b><small>${l}</small></div>`).join("")}</div>
+      <div class="table-wrap" style="margin-top:10px"><table class="num"><thead><tr><th>Competição</th>${COLS.map(c=>`<th>${c[1]}</th>`).join("")}</tr></thead><tbody>${ex.splits.map(x=>`<tr><td style="text-align:left">${esc(x.lg)}</td>${COLS.map(c=>`<td>${x.d[c[0]]||0}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="muted small" style="margin-top:6px">Fonte: ESPN. “Tit.” conta só os jogos em que o atleta começou jogando.</div></section>`;
+  } else if(p.st){
+    stats=`<section class="sec"><div class="card stat3"><div><b class="num">${p.st.j}</b><small>Jogos</small></div><div><b class="num">${p.st.g}</b><small>Gols</small></div><div><b class="num">${p.st.a}</b><small>Assistências</small></div></div><div class="muted small" style="margin-top:6px">Estatísticas de exemplo da temporada.</div></section>`;
+  }
+  const dados=[["Nome completo",esc(p.full||p.name)],["Nascimento",b?`${b} (${a} anos)`:null],["Nacionalidade",p.nat&&p.nat!=="—"?esc(p.nat):null],["Altura",p.h?esc(p.h):null],["Posição",esc(p.pos)],["Camisa",esc(p.num)],["Pé dominante",p.foot?esc(p.foot):null]].filter(([k,v])=>v||!REAL);
+  const hist=(ex&&ex.hist&&ex.hist.length)?ex.hist:(p.hist||[]);
   return `<a class="back" href="#elenco">${ic("back")}Elenco</a>
     <div class="hero"><div class="row" style="gap:16px">${pavatar(p,"lg","background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:var(--hero-fg)")}
       <div class="grow"><div class="eyebrow">Camisa ${esc(p.num)} · ${esc(p.pos)}</div><h1 style="font-size:40px;margin-top:6px">${esc(p.name)}</h1></div>
       <button class="star ${isFav(p.id)?"on":""}" style="color:var(--hero-fg)" data-fav="${p.id}" aria-pressed="${isFav(p.id)}" aria-label="Favoritar ${esc(p.name)}">${ic("star")}</button></div></div>
-    ${st?`<section class="sec"><div class="card stat3"><div><b class="num">${st.j}</b><small>Jogos</small></div><div><b class="num">${st.g}</b><small>Gols</small></div><div><b class="num">${st.a}</b><small>Assistências</small></div></div>
-      <div class="muted small" style="margin-top:6px">Estatísticas de exemplo da temporada.</div></section>`:""}
-    <section class="sec"><div class="sec-h"><h2>Dados</h2></div><div class="card kv">
-      <div><small>Nome completo</small>${esc(p.full||p.name)}</div>
-      <div><small>Nascimento</small>${b?`${b} (${a} anos)`:na}</div>
-      <div><small>Nacionalidade</small>${esc(p.nat)}</div>
-      <div><small>Altura</small>${p.h?esc(p.h):na}</div>
-      <div><small>Pé dominante</small>${p.foot?esc(p.foot):na}</div></div></section>
-    <section class="sec"><div class="sec-h"><h2>Redes sociais</h2></div><div class="card row" style="flex-wrap:wrap;gap:14px">
+    ${stats}
+    <section class="sec"><div class="sec-h"><h2>Dados</h2></div><div class="card kv">${dados.map(([k,v])=>`<div><small>${k}</small>${v||na}</div>`).join("")}</div></section>
+    ${(p.ig||p.x||!REAL)?`<section class="sec"><div class="sec-h"><h2>Redes sociais</h2></div><div class="card row" style="flex-wrap:wrap;gap:14px">
       ${p.ig?`<a class="link row" style="gap:6px" href="https://instagram.com/${encodeURIComponent(p.ig)}" target="_blank" rel="noopener">${ic("link")}Instagram @${esc(p.ig)}</a>`:""}
       ${p.x?`<a class="link row" style="gap:6px" href="https://x.com/${encodeURIComponent(p.x)}" target="_blank" rel="noopener">${ic("link")}X @${esc(p.x)}</a>`:""}
-      ${!p.ig&&!p.x?na:""}</div></section>
-    <section class="sec"><div class="sec-h"><h2>Trajetória</h2></div><div class="card stack">${(p.hist&&p.hist.length)?p.hist.map(h=>`<div>${esc(h)}</div>`).join(""):na}</div></section>`;
+      ${!p.ig&&!p.x?na:""}</div></section>`:""}
+    <section class="sec"><div class="sec-h"><h2>Trajetória</h2></div><div class="card stack">${hist.length?hist.map(h=>`<div>${esc(h)}</div>`).join(""):((REAL&&p.espn&&!ex)?'<span class="muted">Carregando…</span>':(REAL?'<span class="muted">Sem histórico disponível.</span>':na))}</div></section>`;
 };
 
 let campSel="Brasileirão";
@@ -1020,11 +1168,13 @@ function sortT(a,b){if(a.rank&&b.rank)return a.rank-b.rank; return b.pts-a.pts||
 V.campeonatos=()=>{
   const c=CAMP[campSel]||{info:"",phase:"",rows:null,bracket:[]};
   let body="";
-  if(c.rows){
-    const rows=[...c.rows].sort(sortT);
-    body=`<div class="table-wrap"><table class="num"><thead><tr><th>#</th><th>Time</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
-      ${rows.map((r,i)=>`<tr class="${r.t==="Santos"?"me":""} ${i<c.lib?"z-lib":i>=rows.length-c.reb?"z-reb":""}"><td>${i+1}</td><td><span style="display:inline-flex;align-items:center;gap:8px">${tb(r.t,20)}${esc(r.t)}</span></td><td><b>${r.pts}</b></td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg}</td></tr>`).join("")}</tbody></table></div>
-      <p class="muted small" style="margin-top:8px">Faixa clara: vagas na Libertadores. Faixa vermelha: zona de rebaixamento.</p>`;
+  const liveOn=campSel==="Brasileirão"&&LGL.live.length>0;
+  if(CUPSLUG[campSel]&&!c.rows){ loadCup(campSel); body=cupHTML(campSel); }
+  else if(c.rows){
+    body=(liveOn?`<div class="card lst" style="margin-bottom:12px">${liveRows()}</div>
+      <div class="chips"><button class="chip" aria-pressed="${LV==="live"}" data-lv="live">Ao vivo (projeção)</button><button class="chip" aria-pressed="${LV==="off"}" data-lv="off">Oficial</button></div>
+      <p class="muted small" style="margin:4px 0 10px">${LV==="live"?(LGL.incl?"A ESPN já soma os jogos em andamento na tabela.":"Projeção: cada jogo em andamento conta pelo placar atual, como se terminasse agora. ▲ e ▼ mostram quanto o time sobe ou desce em relação à tabela oficial."):"Tabela oficial: só conta jogos encerrados."}</p>`:"")
+      +tableHTML(campSel,true)+`<p class="muted small" style="margin-top:8px">Faixa clara: vagas na Libertadores. Faixa vermelha: zona de rebaixamento.</p>`;
   } else if(!c.bracket||!c.bracket.length){
     body=`<div class="empty">Tabela não disponível. Veja abaixo os jogos do Santos.</div>`;
   } else {
@@ -1033,8 +1183,8 @@ V.campeonatos=()=>{
   const nextC=NEXT.filter(m=>m.comp===campSel).slice(0,2), lastC=PAST.filter(m=>m.comp===campSel).slice(0,2);
   return `<a class="back" href="#mais">${ic("back")}Mais</a><h1 class="page-t">Campeonatos</h1>
     <div class="chips">${COMPS.map(c=>`<button class="chip" aria-selected="${campSel===c}" data-comp="${c}">${c}</button>`).join("")}</div>
-    <p class="muted small" style="margin:6px 0 12px">${esc(c.info)} · ${esc(c.phase)}</p>${body}
-    ${(nextC.length||lastC.length)?`<section class="sec"><div class="sec-h"><h2>Rodadas do Santos</h2></div><div class="stack">${[...nextC,...lastC].map(m=>`<div class="card">${matchLine(m)}</div>`).join("")}</div></section>`:""}
+    <p class="muted small" style="margin:6px 0 12px">${esc(c.info||"")}${c.phase?" · "+esc(c.phase):""}</p>${body}
+    ${(nextC.length||lastC.length)?`<section class="sec"><div class="sec-h"><h2>Jogos do Santos</h2></div><div class="card lst">${[...nextC,...lastC].map(matchRow).join("")}</div></section>`:""}
     ${REAL?"":`<section class="sec"><div class="sec-h"><h2>Temporadas anteriores</h2></div><div class="stack">${HIST.map(h=>`<div class="card row"><div class="num" style="font-family:var(--display);font-weight:800;font-size:28px;width:56px">${h.y}</div><div class="grow"><b>${esc(h.c)}</b><div class="muted small">${esc(h.desc)}</div></div><span class="tag">${esc(h.pos)}</span></div>`).join("")}</div></section>`}`;
 };
 
@@ -1117,7 +1267,7 @@ function route(){
   renderChrome(v);
   const y=window.scrollY, keepFocus=document.activeElement&&document.activeElement.id;
   const val=keepFocus==="nq"?$("#nq").value:null;
-  const bn=$("#banner"); if(bn)bn.textContent=LOADING?"Buscando dados do Santos…":REAL?"Dados reais de jogos, tabela, elenco e placar ao vivo via ESPN (atualizado às "+fmtTime(LASTSYNC)+"). Notícias e publicações de setoristas ainda são exemplos.":"Versão de demonstração: sem conexão com a fonte de dados neste ambiente. Placares, notícias e publicações são exemplos.";
+  const bn=$("#banner"); if(bn)bn.textContent=LOADING?"Buscando dados do Santos…":REAL?"Dados reais de jogos, tabela, elenco e placar ao vivo via ESPN (atualizado às "+fmtTime(LASTSYNC)+"). Notícias da ESPN Brasil. Publicações de setoristas ainda são exemplos.":"Versão de demonstração: sem conexão com a fonte de dados neste ambiente. Placares, notícias e publicações são exemplos.";
   if(LOADING){$("#view").innerHTML='<div class="empty" style="margin-top:24px">Carregando dados do Santos…</div>'; return;}
   if(v==="partida"&&arg!==lastMatch){const mm=findMatch(arg); MT=(mm&&liveOf(mm)&&!liveOf(mm).done)?"video":"partida"; MTEAM="S"; lastMatch=arg;}
   $("#view").innerHTML=V[v](arg);
@@ -1136,6 +1286,8 @@ document.addEventListener("click",e=>{
   if(el=t.closest("[data-fav]")){e.stopPropagation(); const id=el.dataset.fav; S.favP=isFav(id)?S.favP.filter(x=>x!==id):[...S.favP,id]; save(); route(); return;}
   if(el=t.closest("[data-favs]")){const id=el.dataset.favs; S.favS=S.favS.includes(id)?S.favS.filter(x=>x!==id):[...S.favS,id]; save(); route(); return;}
   if(el=t.closest("[data-vsel]")){VSEL[lastMatch]=el.dataset.vsel; VPLAY[lastMatch]=true; route(); return;}
+  if(el=t.closest("[data-lv]")){LV=el.dataset.lv; route(); return;}
+  if(el=t.closest("[data-stage]")){CUPSTAGE[campSel]=el.dataset.stage; route(); return;}
   if(el=t.closest("[data-mt]")){MT=el.dataset.mt; route(); return;}
   if(el=t.closest("[data-mteam]")){MTEAM=el.dataset.mteam; route(); return;}
   if(el=t.closest("[data-go]")){location.hash=el.dataset.go; return;}
@@ -1187,7 +1339,7 @@ document.addEventListener("submit",e=>{
 });
 
 route();
-loadReal().then(()=>{LOADING=false; log("Dados reais carregados da ESPN."); route(); pollLive();}).catch(()=>{LOADING=false; route();});
+loadReal().then(()=>{LOADING=false; log("Dados reais carregados da ESPN."); route(); pollLive(); pollLeague(); loadNews().then(()=>route()).catch(()=>{}); setInterval(()=>{loadNews().then(()=>{if(["noticias","inicio"].includes(curView()))route();}).catch(()=>{});},300000); setInterval(refreshStandings,600000);}).catch(()=>{LOADING=false; route();});
 })();
 </script>
 
